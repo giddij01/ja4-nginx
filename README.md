@@ -42,11 +42,42 @@ After building the software, copy `./nginx_utils/nginx.conf` and your `server.cr
 
 `sudo ./nginx_local/sbin/nginx -g "daemon off;"`
 
-### Logging/Debugging
+### Logging
 
 You can log data to `nginx_local/logs/error.log` like this:
 
 `ngx_log_debug2(NGX_LOG_DEBUG_EVENT, pool->log, 0, "ssl_ja4: |    cipher: 0x%04uxD -> %d", ja4->ciphers[i], ja4->ciphers[i]);`
+
+### Debugging
+
+Use gdb for inline breakpoints and step-through debugging capability.
+
+1. start server normally
+`sudo ./nginx_local/sbin/nginx -g "daemon off;"`
+2. find the worker process id
+`ps aux | grep nginx`
+
+```bash
+thatcher@local-yocal:~/projects/work/foxio/ja4-nginx$ ps aux | grep nginx
+root      262272  0.0  0.0  14360  5888 pts/6    S+   15:20   0:00 sudo ./nginx_local/sbin/nginx -g daemon off;
+root      262273  0.0  0.0  14360  2492 pts/8    Ss   15:20   0:00 sudo ./nginx_local/sbin/nginx -g daemon off;
+root      262274  0.0  0.0  11272  7680 pts/8    S+   15:20   0:00 nginx: master process ./nginx_local/sbin/nginx -g daemon off;
+nobody    262275  0.0  0.0  11704  7260 pts/8    S+   15:20   0:00 nginx: worker process <-------------- this is the pid you want!
+thatcher  262600  0.0  0.0   9084  2304 pts/9    S+   15:22   0:00 grep --color=auto nginx
+```
+
+3. attach gdb to the process
+`sudo gdb -p 262275`
+
+4. set a breakpoint in gdb, for example:
+break ngx_http_ssl_ja4_module.c:<line_num>
+
+5. generate a request at <https://localhost>
+if it is set up correctly, the request should hang
+
+6. in gdb, type `continue` to proceed to the breakpoint
+
+7. `quit` to exit gdb
 
 ### Parity with Nginx
 
