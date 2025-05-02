@@ -1959,6 +1959,7 @@ ngx_SSL_early_cb_fn(SSL *s, int *al, void *arg) {
     }
 
     OPENSSL_free(ext_out);
+
     return 1;
 }
 
