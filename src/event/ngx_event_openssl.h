@@ -123,6 +123,7 @@ struct ngx_ssl_connection_s {
 
     // ja4
     int             version;
+    int             highest_supported_tls_client_version;
 
     size_t          ciphers_sz;
     char **ciphers;

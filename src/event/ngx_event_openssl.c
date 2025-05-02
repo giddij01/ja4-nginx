@@ -1867,6 +1867,16 @@ ngx_SSL_early_cb_fn(SSL *s, int *al, void *arg) {
     int                            got_extensions;
     int                           *ext_out;
     size_t                         ext_len;
+
+    // Declare the highest client TLS protocol version
+    int                            highest_supported_tls_client_version;
+
+    const unsigned char           *supported_versions_ext;
+    size_t                         supported_versions_ext_len;
+
+    const unsigned char           *supported_versions;
+    size_t                         supported_versions_len;
+
     ngx_connection_t              *c;
 
     c = arg;
@@ -1900,7 +1910,34 @@ ngx_SSL_early_cb_fn(SSL *s, int *al, void *arg) {
         for (size_t i = 0; i < ext_len; i++) {
             char hex_str[6];  // Buffer to hold the hexadecimal string (4 digits + null terminator)
             snprintf(hex_str, sizeof(hex_str), "%04x", ext_out[i]);
-            
+
+            // Check for the supported_versions extension (0x002b) in the ClientHello
+            if (ext_out[i] == 0x002b) {
+                ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0, "Found supported_versions extension (0x002b)");
+
+                if (SSL_client_hello_get0_ext(s, 0x002b, &supported_versions_ext, &supported_versions_ext_len)) {
+
+                    // Skip the first byte as it denotes the length of the list
+                    supported_versions_len = supported_versions_ext_len - 1;
+
+                    supported_versions = supported_versions_ext + 1;
+                    highest_supported_tls_client_version = 0;
+
+                    // Extracts and constructs SSL/TLS versions from supported_versions array
+                    for (size_t j = 0; j + 1 < supported_versions_len; j += 2) {
+                        int version = (supported_versions[j] << 8) | supported_versions[j + 1];
+
+                        if (version > highest_supported_tls_client_version) {
+                            highest_supported_tls_client_version = version;
+                        }
+                    }
+
+                    // Set highest supported TLS version for JA4 module
+                    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, c->log, 0, "Highest TLS protocol version found: %d", highest_supported_tls_client_version);
+                    c->ssl->highest_supported_tls_client_version = highest_supported_tls_client_version;
+                }
+            }
+
             // Allocate memory for the hex string and copy it
             c->ssl->extensions[i] = ngx_pnalloc(c->pool, sizeof(hex_str));
             if (c->ssl->extensions[i] == NULL) {
@@ -1922,7 +1959,6 @@ ngx_SSL_early_cb_fn(SSL *s, int *al, void *arg) {
     }
 
     OPENSSL_free(ext_out);
-
     return 1;
 }
 
